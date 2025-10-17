@@ -6,18 +6,19 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const twilio = require("twilio");
+require('dotenv').config();
 const app = express();
 
 // 🧩 NEW: Import node-cron to schedule jobs
 const cron = require("node-cron");
 
-// 🧩 Twilio credentials (replace with your real ones)
-const accountSid = "AC09deb9c36cdc8a02743b956dc3d93ba0";
-const authToken = "66674286a50700565d445a855f235bad";
+// 🧩 SECURE: Twilio credentials from environment variables
+const accountSid = process.env.TWILIO_ACCOUNT_SID; // 🔒 FROM .env FILE
+const authToken = process.env.TWILIO_AUTH_TOKEN;   // 🔒 FROM .env FILE
 const client = twilio(accountSid, authToken);
 
 // Step 2: Setup server port
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Step 3: Ensure a 'data' folder exists
 const dataDir = path.join(__dirname, "data");
