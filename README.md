@@ -1,32 +1,21 @@
-# LifeLine Reminder – Starter Template
+<<<<<<< HEAD
+# LifeLine Reminder – WhatsApp Auto-Reply App
 
-This is a beginner-friendly starter for Week 5.
+A beginner-friendly WhatsApp reminder app built with Node.js and Twilio.
 
-## Files
+## 🚀 Quick Start (For Beginners)
+
+### Files
 - `index.html` — the web form (what users fill)
-- `server.js` — Node.js server that handles submissions
+- `server.js` — Node.js server that handles submissions  
 - `package.json` — dependencies and start script
 - `reminders.csv` — will be created after first submission
 
-## Quick steps (for Monday)
-1. Unzip the folder.
-2. Open a terminal inside the folder.
+### Local Development
+1. Unzip the folder
+2. Open terminal in the folder
 3. Run:
-    npm install
-    npm start
-
-4. Open your browser to `http://localhost:3000`
-5. Fill and submit the form.
-6. Watch the terminal — you'll see the reminder printed.
-7. Check `reminders.csv` — it has the saved data.
-
-## Troubleshooting (common beginner issues)
-- If `npm install` fails: make sure Node.js is installed. Use Node v14+.
-- If `npm start` says port in use: change `PORT` in `server.js` to another number (e.g., 3001).
-- If you see permission errors writing the CSV, try running terminal as normal user and ensure the folder is writable.
-
-## Next steps (Tue/Wed)
-- Tue: Set up VS Code and run the server locally.
-- Wed: Start editing `index.html` or `server.js` as instructed.
-
-If anything breaks, paste the terminal output in the group and I’ll help.
+   ```bash
+   npm install
+   npm start
+>>>>>>> ccc724a8f674d1b5e5b985e182d30d9dc7341822

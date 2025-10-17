@@ -1,21 +1,56 @@
+<<<<<<< HEAD
 # 🧩 Node.js dependencies
 node_modules/
-
-# 🔒 Environment variables (never upload secrets)
-.env
-
-# 💾 Local data (your saved reminders)
-data/
-
-# 🧱 System files
-.DS_Store
-Thumbs.db
-
-# 🧰 Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# ⚙️ Build folders (if ever generated)
+# 🔒 Environment variables (never upload secrets)
+.env
+.env.*
+!.env.example
+
+# 💾 Local data (your saved reminders)
+data/
+
+# 🖥️ System files
+.DS_Store
+Thumbs.db
+
+# 📊 Coverage reports
+coverage/
+.nyc_output
+
+# 🏗️ Build folders
 dist/
 build/
+.next/
+out/
+.nuxt/
+
+# 🔥 Cache directories
+.cache/
+.parcel-cache
+.svelte-kit/
+.vuepress/dist
+.docusaurus
+
+# 📝 Logs
+logs
+*.log
+lerna-debug.log*
+
+# 🚀 Deployment (we use Vercel/Render)
+.serverless/
+
+# 🛠️ Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 📦 Package manager
+.npm
+.yarn/
+.pnp.*
+>>>>>>> ccc724a8f674d1b5e5b985e182d30d9dc7341822
