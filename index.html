@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LifeLine Reminder</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 500px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    input, button {
+      padding: 8px;
+      margin: 5px 0;
+      width: 100%;
+    }
+    button {
+      background: #00aaff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    h1 { text-align: center; color: #333; }
+  </style>
+</head>
+<body>
+  <h1>📌 LifeLine</h1>
+  <form action="/submit" method="POST">
+    <!-- Your Name -->
+    <label>Your Name:</label><br />
+    <input type="text" name="name" required placeholder="e.g., Yomi" /><br /><br />
+
+    <!-- What to remind -->
+    <label>What should we remind about?</label><br />
+    <input type="text" name="what" required placeholder="e.g., Call Dad" /><br /><br />
+
+    <!-- Who gets it -->
+    <label>Who should get it?</label><br />
+    <input type="text" name="who" required placeholder="e.g., Ada" /><br /><br />
+
+    <!-- Date & Time -->
+    <label>Date & Time:</label><br />
+    <input type="datetime-local" name="datetime" required /><br /><br />
+
+    <!-- WhatsApp Number (Africa Format) -->
+    <label>WhatsApp Number (Optional):</label><br />
+    <input type="text" name="whatsapp" placeholder="e.g., 2348123456789" /><br />
+    <small>Use full number (no +), e.g., 2348123456789</small><br /><br />
+
+    <!-- Submit -->
+    <button type="submit">✅ Save Reminder</button>
+  </form>
+</body>
+</html>

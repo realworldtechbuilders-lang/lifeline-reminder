@@ -1,0 +1,21 @@
+# 🧩 Node.js dependencies
+node_modules/
+
+# 🔒 Environment variables (never upload secrets)
+.env
+
+# 💾 Local data (your saved reminders)
+data/
+
+# 🧱 System files
+.DS_Store
+Thumbs.db
+
+# 🧰 Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ⚙️ Build folders (if ever generated)
+dist/
+build/
