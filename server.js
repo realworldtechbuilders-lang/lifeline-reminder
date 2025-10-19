@@ -52,18 +52,26 @@ async function sendWhatsAppMessage(name, what, who, datetime, whatsapp) {
 
 // ✳️ NEW: Schedule a one-time reminder using setTimeout
 function scheduleReminder(name, what, who, datetime, whatsapp) {
-  const delay = new Date(datetime) - new Date();
+  const targetTime = new Date(datetime);
+
+  // ✅ Adjust for Nigeria timezone (UTC+1)
+  const adjustedTime = new Date(targetTime.getTime() - (60 * 60 * 1000)); // subtract 1 hour
+
+  const now = new Date();
+  const delay = adjustedTime - now;
+
   if (delay <= 0) {
     console.log("⚠️ Reminder time already passed:", datetime);
     return;
   }
 
-  console.log(`⏰ Reminder scheduled for ${datetime} (${Math.round(delay / 1000)}s from now)`);
+  console.log(`⏰ Reminder scheduled for ${adjustedTime.toISOString()} (${Math.round(delay / 1000)}s from now)`);
 
   setTimeout(() => {
     sendWhatsAppMessage(name, what, who, datetime, whatsapp);
   }, delay);
 }
+
 
 // Step 7: Handle form submission
 app.post("/submit", async (req, res) => {
