@@ -128,35 +128,40 @@ fs.readFile(filePath, "utf8", (err, data) => {
 
 // ✅ NEW: Route for cron-job.org
 app.get("/check-reminders", async (req, res) => {
-  const now = new Date();
+  try {
+    const now = new Date();
 
-  // (Optional security) only run if correct key is passed
-  if (req.query.key !== process.env.CRON_SECRET) {
-    return res.status(403).send("Forbidden");
-  }
-
-  fs.readFile(filePath, "utf8", async (err, data) => {
-    if (err) return res.send("No reminders yet.");
-
-    const lines = data.trim().split("\n");
-    let sentCount = 0;
-
-    for (const line of lines) {
-      const [name, what, who, datetime, whatsapp] = line.split(",");
-      if (whatsapp && new Date(datetime) <= now) {
-        try {
-          await sendWhatsAppMessage(name, what, who, datetime, whatsapp);
-          sentCount++;
-        } catch (err) {
-          console.error("❌ Error sending scheduled message:", err.message);
-        }
-      }
+    if (req.query.key !== process.env.CRON_SECRET) {
+      return res.status(403).send("Forbidden");
     }
 
-    console.log(`🕒 Checked reminders — sent ${sentCount} messages`);
-    res.send(`Checked reminders — sent ${sentCount} messages`);
-  });
+    fs.readFile(filePath, "utf8", async (err, data) => {
+      if (err) return res.send("No reminders yet.");
+
+      const lines = data.trim().split("\n");
+      let sentCount = 0;
+
+      for (const line of lines) {
+        const [name, what, who, datetime, whatsapp] = line.split(",");
+        if (whatsapp && new Date(datetime) <= now) {
+          try {
+            await sendWhatsAppMessage(name, what, who, datetime, whatsapp);
+            sentCount++;
+          } catch (err) {
+            console.error("❌ Error sending scheduled message:", err.message);
+          }
+        }
+      }
+
+      console.log(`🕒 Checked reminders — sent ${sentCount} messages`);
+      res.send(`Checked reminders — sent ${sentCount} messages`);
+    });
+  } catch (error) {
+    console.error("❌ Error in /check-reminders route:", error.message);
+    res.status(500).send("Internal Server Error");
+  }
 });
+
 
 // Step 9: Start the server
 app.listen(PORT, () => {
