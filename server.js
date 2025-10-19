@@ -135,33 +135,46 @@ app.get("/check-reminders", async (req, res) => {
       return res.status(403).send("Forbidden");
     }
 
-    fs.readFile(filePath, "utf8", async (err, data) => {
-      if (err) return res.send("No reminders yet.");
+    if (!fs.existsSync(filePath)) {
+      return res.send("No reminders yet.");
+    }
 
-      const lines = data.trim().split("\n");
-      let sentCount = 0;
+    const data = fs.readFileSync(filePath, "utf8");
+    const lines = data.trim().split("\n");
+    let sentCount = 0;
+    let updatedLines = [];
 
-      for (const line of lines) {
-        const [name, what, who, datetime, whatsapp] = line.split(",");
-        if (whatsapp && new Date(datetime) <= now) {
-          try {
-            await sendWhatsAppMessage(name, what, who, datetime, whatsapp);
-            sentCount++;
-          } catch (err) {
-            console.error("❌ Error sending scheduled message:", err.message);
-          }
-        }
+    for (const line of lines) {
+      let [name, what, who, datetime, whatsapp, sent] = line.split(",");
+
+      // Skip if already marked as sent
+      if (sent === "sent") {
+        updatedLines.push(line);
+        continue;
       }
 
-      console.log(`🕒 Checked reminders — sent ${sentCount} messages`);
-      res.send(`Checked reminders — sent ${sentCount} messages`);
-    });
+      if (whatsapp && new Date(datetime) <= now) {
+        try {
+          await sendWhatsAppMessage(name, what, who, datetime, whatsapp);
+          sentCount++;
+          updatedLines.push(`${name},${what},${who},${datetime},${whatsapp},sent`);
+        } catch (err) {
+          console.error("❌ Error sending scheduled message:", err.message);
+          updatedLines.push(line); // keep it unsent if failure
+        }
+      } else {
+        updatedLines.push(line);
+      }
+    }
+
+    fs.writeFileSync(filePath, updatedLines.join("\n"), "utf8");
+    console.log(`🕒 Checked reminders — sent ${sentCount} message(s)`);
+    res.send(`Checked reminders — sent ${sentCount} message(s)`);
   } catch (error) {
     console.error("❌ Error in /check-reminders route:", error.message);
     res.status(500).send("Internal Server Error");
   }
 });
-
 
 // Step 9: Start the server
 app.listen(PORT, () => {
