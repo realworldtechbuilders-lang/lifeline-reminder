@@ -68,7 +68,12 @@ function scheduleReminder(name, what, who, datetime, whatsapp) {
 // Step 7: Handle form submission
 app.post("/submit", async (req, res) => {
   const { name, what, who, datetime, whatsapp } = req.body;
-  const row = `${name},${what},${who},${datetime},${whatsapp || ""}\n`;
+
+  // 🌍 Convert local datetime to UTC before saving
+  const localDate = new Date(datetime);
+  const utcDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000).toISOString();
+
+  const row = `${name},${what},${who},${utcDate},${whatsapp || ""}\n`;
 
   fs.appendFile(filePath, row, async (err) => {
     if (err) {
@@ -79,7 +84,7 @@ app.post("/submit", async (req, res) => {
     console.log("✅ Saved reminder:", row.trim());
 
     // 🧩 NEW: Schedule reminder for later (not instant)
-    if (whatsapp) scheduleReminder(name, what, who, datetime, whatsapp);
+    if (whatsapp) scheduleReminder(name, what, who, utcDate, whatsapp);
 
     // 🧩 Optional: Send immediate confirmation message
     try {
@@ -87,7 +92,7 @@ app.post("/submit", async (req, res) => {
         const confirmMsg = await client.messages.create({
           from: "whatsapp:+14155238886",
           to: `whatsapp:${whatsapp}`,
-          body: `✅ Hi ${name}, your reminder for "${what}" on ${datetime} has been set successfully.`,
+          body: `✅ Hi ${name}, your reminder for "${what}" on ${utcDate} has been set successfully.`,
         });
         console.log("📩 Confirmation sent:", confirmMsg.sid);
       }
@@ -102,7 +107,7 @@ app.post("/submit", async (req, res) => {
           <h2>✅ LifeLine Reminder Set!</h2>
           <p><strong>Reminder:</strong> ${what}</p>
           <p><strong>For:</strong> ${who}</p>
-          <p><strong>When:</strong> ${datetime}</p>
+          <p><strong>When:</strong> ${utcDate}</p>
           <p><em>You’ll receive a WhatsApp reminder at the scheduled time.</em></p>
           <a href="/">← Set another reminder</a>
         </body>
@@ -110,6 +115,7 @@ app.post("/submit", async (req, res) => {
     `);
   });
 });
+
 
 // Step 8: On server start, reload and reschedule all future reminders
 fs.readFile(filePath, "utf8", (err, data) => {
