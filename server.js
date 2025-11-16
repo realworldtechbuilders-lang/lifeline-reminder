@@ -1,48 +1,47 @@
 // server.js
-// 🌟 LIFE LINE REMINDER - SCHEDULED WHATSAPP MESSAGES
+// 🌟 LIFE LINE REMINDER - WHATSAPP REMINDER SYSTEM
 
-// Step 1: Load required modules
+// Load required modules
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const twilio = require("twilio");
-require('dotenv').config();
+require("dotenv").config();
 const app = express();
 
-// 🧩 NEW: Import node-cron to schedule jobs
-const cron = require("node-cron");
+// ⚠️ NOTE: Removed node-cron import — not used yet.
 
-// 🧩 SECURE: Twilio credentials from environment variables
-const accountSid = process.env.TWILIO_ACCOUNT_SID; // 🔒 FROM .env FILE
-const authToken = process.env.TWILIO_AUTH_TOKEN;   // 🔒 FROM .env FILE
+// Twilio credentials
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
 const client = twilio(accountSid, authToken);
 
-// Step 2: Setup server port
+// Port
 const PORT = process.env.PORT || 3000;
 
-// Step 3: Ensure a 'data' folder exists
+// Ensure data folder exists
 const dataDir = path.join(__dirname, "data");
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir);
   console.log("📁 Created 'data' folder");
 }
 
-// Step 4: Where to save reminders
+// Path to CSV
 const filePath = path.join(dataDir, "reminders.csv");
 
-// Step 5: Enable form submissions
+// Keep this temporarily (form still works during migration)
 app.use(express.urlencoded({ extended: true }));
 
-// Step 6: Serve static files (e.g., index.html)
-app.use(express.static(__dirname));
+// ❌ REMOVED app.use(express.static(__dirname));
+// Reason: We are moving away from HTML form → WhatsApp chat.
 
-// ✳️ NEW: Function to send WhatsApp message
+// Send WhatsApp message
 async function sendWhatsAppMessage(name, what, who, datetime, whatsapp) {
   try {
     const message = await client.messages.create({
-      from: "whatsapp:+14155238886", // Twilio sandbox number
+      from: process.env.TWILIO_WHATSAPP_FROM, // ✔️ moved to .env
       to: `whatsapp:${whatsapp}`,
-      body: `🔔 Hi ${name}, this is a reminder for "${what}" (for ${who}) scheduled on ${datetime}.`,
+      body: `🔔 Hi ${name}, reminder: "${what}" for ${who} at ${datetime}.`,
     });
     console.log("📲 Reminder sent:", message.sid);
   } catch (err) {
@@ -50,71 +49,28 @@ async function sendWhatsAppMessage(name, what, who, datetime, whatsapp) {
   }
 }
 
-// ✳️ NEW: Schedule a one-time reminder using setTimeout
+// Schedule reminder using setTimeout
 function scheduleReminder(name, what, who, datetime, whatsapp) {
   const targetTime = new Date(datetime);
   const now = new Date();
   const delay = targetTime - now;
 
   if (delay <= 0) {
-    console.log("⚠️ Reminder time already passed:", datetime);
+    console.log("⚠️ Reminder time has passed:", datetime);
     return;
   }
 
-  console.log(`⏰ Reminder scheduled for ${targetTime.toISOString()} (${Math.round(delay / 1000)}s from now)`);
+  console.log(`⏰ Reminder scheduled for ${targetTime}`);
 
   setTimeout(() => {
     sendWhatsAppMessage(name, what, who, datetime, whatsapp);
   }, delay);
 }
 
-// Step 7: Handle form submission
-app.post("/submit", async (req, res) => {
-  const { name, what, who, datetime, whatsapp } = req.body;
-  const row = `${name},${what},${who},${datetime},${whatsapp || ""}\n`;
+// ❌ REMOVED: The entire /submit route
+// Reason: users will now chat via WhatsApp, not fill forms.
 
-  fs.appendFile(filePath, row, async (err) => {
-    if (err) {
-      console.error("❌ Error saving reminder:", err);
-      return res.send("❌ Failed to save reminder.");
-    }
-
-    console.log("✅ Saved reminder:", row.trim());
-
-    // Schedule reminder
-    if (whatsapp) scheduleReminder(name, what, who, datetime, whatsapp);
-
-    // Send confirmation message
-    try {
-      if (whatsapp) {
-        const confirmMsg = await client.messages.create({
-          from: "whatsapp:+14155238886",
-          to: `whatsapp:${whatsapp}`,
-          body: `✅ Hi ${name}, your reminder for "${what}" on ${datetime} has been set successfully.`,
-        });
-        console.log("📩 Confirmation sent:", confirmMsg.sid);
-      }
-    } catch (err) {
-      console.error("❌ Error sending confirmation:", err.message);
-    }
-
-    res.send(`
-      <html>
-        <head><title>Success!</title></head>
-        <body style="font-family:sans-serif;">
-          <h2>✅ LifeLine Reminder Set!</h2>
-          <p><strong>Reminder:</strong> ${what}</p>
-          <p><strong>For:</strong> ${who}</p>
-          <p><strong>When:</strong> ${datetime}</p>
-          <p><em>You’ll receive a WhatsApp reminder at the scheduled time.</em></p>
-          <a href="/">← Set another reminder</a>
-        </body>
-      </html>
-    `);
-  });
-});
-
-// Step 8: On server start, reload and reschedule all future reminders
+// Re-schedule reminders on startup (keep temporarily)
 fs.readFile(filePath, "utf8", (err, data) => {
   if (err) return console.log("ℹ️ No existing reminders yet.");
 
@@ -129,7 +85,7 @@ fs.readFile(filePath, "utf8", (err, data) => {
   });
 });
 
-// ✅ NEW: Route for cron-job.org
+// ✔️ KEEP /check-reminders for now (cron-job fallback)
 app.get("/check-reminders", async (req, res) => {
   try {
     const now = new Date();
@@ -150,7 +106,6 @@ app.get("/check-reminders", async (req, res) => {
     for (const line of lines) {
       let [name, what, who, datetime, whatsapp, sent] = line.split(",");
 
-      // Skip if already marked as sent
       if (sent === "sent") {
         updatedLines.push(line);
         continue;
@@ -163,7 +118,7 @@ app.get("/check-reminders", async (req, res) => {
           updatedLines.push(`${name},${what},${who},${datetime},${whatsapp},sent`);
         } catch (err) {
           console.error("❌ Error sending scheduled message:", err.message);
-          updatedLines.push(line); // keep it unsent if failure
+          updatedLines.push(line);
         }
       } else {
         updatedLines.push(line);
@@ -171,16 +126,79 @@ app.get("/check-reminders", async (req, res) => {
     }
 
     fs.writeFileSync(filePath, updatedLines.join("\n"), "utf8");
-    console.log(`🕒 Checked reminders — sent ${sentCount} message(s)`);
-    res.send(`Checked reminders — sent ${sentCount} message(s)`);
+    console.log(`🕒 Checked reminders — sent ${sentCount}`);
+    res.send(`Checked reminders — sent ${sentCount}`);
   } catch (error) {
-    console.error("❌ Error in /check-reminders route:", error.message);
+    console.error("❌ Error in /check-reminders:", error.message);
     res.status(500).send("Internal Server Error");
   }
 });
 
-// Step 9: Start the server
+// ✅ NEW: WhatsApp Chat Webhook (users can chat directly with the bot)
+app.post("/whatsapp", express.urlencoded({ extended: true }), async (req, res) => {
+  const incomingMessage = req.body.Body?.trim();
+  const from = req.body.From;
+
+  console.log("💬 Incoming message:", incomingMessage);
+
+  // Step 1: Handle greeting messages
+  if (!incomingMessage) {
+    return res.send("<Response></Response>");
+  }
+
+  if (incomingMessage.toLowerCase() === "hi" || incomingMessage.toLowerCase() === "hello") {
+    return res.send(`
+      <Response>
+        <Message>
+          👋 Hi! I'm LifeLine Reminder.  
+          You can say things like:  
+          "Remind me to call John tomorrow at 8am"
+        </Message>
+      </Response>
+    `);
+  }
+
+  // Step 2: Very simple rule-based parser
+  const pattern = /remind me to (.*) (on|at|by) (.*)/i;
+  const match = incomingMessage.match(pattern);
+
+  if (!match) {
+    return res.send(`
+      <Response>
+        <Message>
+          🤖 I didn't understand that.  
+          Try: "Remind me to take medicine at 9pm"
+        </Message>
+      </Response>
+    `);
+  }
+
+  const what = match[1];
+  const datetime = match[3];
+
+  const name = "User"; 
+  const who = "You";
+  const whatsapp = from.replace("whatsapp:", "");
+
+  const row = `${name},${what},${who},${datetime},${whatsapp}\n`;
+  fs.appendFileSync(filePath, row);
+
+  // Step 4: Schedule the reminder
+  scheduleReminder(name, what, who, datetime, whatsapp);
+
+  // Step 5: Confirm to user
+  res.send(`
+    <Response>
+      <Message>
+        ✅ All set!  
+        I’ll remind you to *${what}* on *${datetime}*.
+      </Message>
+    </Response>
+  `);
+});
+
+// Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
-  console.log(`📝 Reminders saved to: ${filePath}`);
+  console.log(`📝 Saving reminders in: ${filePath}`);
 });
