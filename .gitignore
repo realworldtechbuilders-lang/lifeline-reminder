@@ -10,9 +10,6 @@ yarn-error.log*
 .env.*
 !.env.example
 
-# 💾 Local data (your saved reminders)
-data/
-
 # 🖥️ System files
 .DS_Store
 Thumbs.db
