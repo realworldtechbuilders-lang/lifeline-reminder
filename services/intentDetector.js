@@ -3,23 +3,30 @@
 function detectIntent(message) {
   const lower = message.toLowerCase().trim();
 
-  // REMINDER: Only if starts with "remind me to"
+  // REMINDER
   if (lower.startsWith("remind me to ")) {
     return "REMINDER";
   }
 
-  // GREETING
-  if (["hi", "hello", "hey", "good morning", "good evening"].some(g => lower.includes(g))) {
+  // GREETING & PRESENCE
+  if (
+    ["hi", "hello", "hey"].some(g => lower === g) ||
+    lower.includes("are you there")
+  ) {
     return "GREETING";
   }
 
-  // CHECK_IN: Emotional or state-sharing phrases
+  // CHECK_IN
   if (
     lower.includes("tired") ||
     lower.includes("overwhelmed") ||
     lower.includes("stressed") ||
     lower.includes("anxious") ||
     lower.includes("sad") ||
+    lower.includes("exhausting") ||   // ✅
+    lower.includes("drained") ||      // ✅
+    lower.includes("burned out") ||   // ✅
+    lower.includes("too much") ||     // ✅
     lower.includes("feeling") ||
     lower.includes("it's been a lot") ||
     lower.includes("not good") ||
@@ -28,12 +35,11 @@ function detectIntent(message) {
     return "CHECK_IN";
   }
 
-  // QUESTION: Starts with common query words
+  // QUESTION
   if (/^(did|do|what|how|when|can)/.test(lower)) {
     return "QUESTION";
   }
 
-  // Everything else
   return "UNKNOWN";
 }
 

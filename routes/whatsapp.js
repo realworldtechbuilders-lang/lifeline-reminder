@@ -181,22 +181,33 @@ module.exports = function (app) {
       return res.type("text/xml").send(`<Response></Response>`);
     }
 
-    // ✅ UPDATED: Warm, open-door intro (no "Reminder" label)
-    if (["hi", "hello", "hey"].includes(lowerClean)) {
-      // 🌟 GREETING EVENT LOG
-      console.log("🌟 Greeting received:", whatsappId);
-      return res.type("text/xml").send(`
-        <Response><Message>
-        👋 Hi, I'm Tim from Lifeline 😊
-        I help you remember things — and I check in with you too.
-        
-        You can say:
-        • "Remind me to stretch in 30 minutes"
-        • "Did I drink water today?"
-        • "I'm feeling tired"
-        • Or just "Hi" anytime!
-        </Message></Response>
-      `);
+    // ✅ ALL non-reminder messages go here
+    if (!lowerClean.startsWith("remind me to ")) {
+      const intent = detectIntent(originalMessage);
+      let replyText;
+
+      switch (intent) {
+        case "GREETING": {
+          const greetings = [
+            "Hi 😊 I’m here.",
+            "Hello. I’m here.",
+            "Hey — I’m here."
+          ];
+          replyText = greetings[Math.floor(Math.random() * greetings.length)];
+          break;
+        }
+        case "CHECK_IN":
+          replyText = "Thanks for telling me. I’m here.";
+          break;
+        case "QUESTION":
+          replyText = "I don’t track that yet, but I can help you set it up.";
+          break;
+        case "UNKNOWN":
+        default:
+          replyText = "I might not have understood that yet.\nYou can say things like ‘remind me to…’ or ‘pause’.";
+      }
+
+      return res.type("text/xml").send(`<Response><Message>${replyText}</Message></Response>`);
     }
 
     // ✅ UPDATED: Replace hard rejection with gentle open-door
