@@ -13,6 +13,11 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
 
 app.use(express.urlencoded({ extended: true }));
 
+// ✅ ADD HEALTH CHECK ROUTE HERE (before other routes)
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 // Register routes
 require('./routes/whatsapp')(app);
 require('./routes/admin')(app);
@@ -23,6 +28,7 @@ loadAndScheduleReminders();
 
 app.listen(PORT, () => {
   console.log(`\n🚀 Server running on http://localhost:${PORT}`);
+  console.log(`✅ Health check: http://localhost:${PORT}/health`);
   console.log(`🖥️ Admin Dashboard: http://localhost:${PORT}/admin`);
   console.log(`📱 WhatsApp Webhook: http://localhost:${PORT}/whatsapp`);
 });

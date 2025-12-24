@@ -1,9 +1,16 @@
 // routes/whatsapp.js
+// WhatsApp entry point for Lifeline Companion (Tim)
+// Reminder logic lives here for MVP
+// Care logic will layer on top (not replace)
+
 const fs = require('fs');
 const path = require('path');
 const chrono = require('chrono-node');
 const db = require('../config/database');
 const { scheduleReminder } = require('../services/scheduler');
+const { normalizeText } = require('../utils/normalizeText');
+const { detectCommand } = require('../services/commandDetector');
+const { detectIntent } = require('../services/intentDetector');
 
 const dataDir = path.join(__dirname, '../data');
 const filePath = path.join(dataDir, 'reminders.csv');
@@ -99,50 +106,142 @@ function handleRecurringInstruction(instruction) {
 
 module.exports = function (app) {
   app.post('/whatsapp', async (req, res) => {
-    const incoming = req.body.Body?.trim();
+    const rawIncoming = req.body.Body?.trim();
     const from = req.body.From;
+    const whatsappId = from.replace("whatsapp:", "");
 
-    console.log("\n💬 Incoming:", incoming);
-    console.log("👤 From:", from);
+    // ❗ REMOVED: console.log("\n💬 Incoming:", rawIncoming); // REMOVE BEFORE PUBLIC LAUNCH
+    // ❗ REMOVED: console.log("👤 From:", whatsappId); // REMOVE BEFORE PUBLIC LAUNCH
 
-    if (!incoming) {
+    if (!rawIncoming) {
       return res.type("text/xml").send(`<Response></Response>`);
     }
 
-    const lower = incoming.toLowerCase();
-    if (["hi", "hello"].includes(lower)) {
+    // 🔹 STEP 1: Normalize text
+    const { original: originalMessage, clean: cleanMessage } = normalizeText(rawIncoming);
+    const lowerClean = cleanMessage.toLowerCase();
+
+    // 🔹 STEP 2: Detect command (PAUSE / RESUME)
+    const command = detectCommand(cleanMessage);
+
+    // 🔹 STEP 3: Load user's current consent status
+    let consentStatus = "active";
+    let userExists = false;
+
+    try {
+      const userRow = db.prepare("SELECT consent_status FROM users WHERE whatsapp = ?").get(whatsappId);
+      if (userRow) {
+        consentStatus = userRow.consent_status;
+        userExists = true;
+      }
+    } catch (err) {
+      console.warn("⚠️ User lookup failed:", err.message);
+    }
+
+    // 🔹 STEP 4: Handle PAUSE command
+    if (command === 'PAUSE') {
+      try {
+        if (userExists) {
+          db.prepare("UPDATE users SET consent_status = 'paused' WHERE whatsapp = ?").run(whatsappId);
+        } else {
+          db.prepare("INSERT INTO users (whatsapp, consent_status) VALUES (?, 'paused')").run(whatsappId);
+          // 🆕 NEW USER LOG
+          console.log("🆕 New user opted in (paused):", whatsappId);
+        }
+        // 🛑 PAUSE EVENT LOG
+        console.log("🛑 Opt-out triggered:", whatsappId);
+      } catch (err) {
+        console.error("❌ Failed to save pause status:", err.message);
+      }
+      return res.type("text/xml").send(`<Response><Message>Okay. I’ll pause for now. You can say ‘resume’ anytime.</Message></Response>`);
+    }
+
+    // 🔹 STEP 5: Handle RESUME command
+    if (command === 'RESUME') {
+      try {
+        if (userExists) {
+          db.prepare("UPDATE users SET consent_status = 'active' WHERE whatsapp = ?").run(whatsappId);
+        } else {
+          db.prepare("INSERT INTO users (whatsapp, consent_status) VALUES (?, 'active')").run(whatsappId);
+          // 🆕 NEW USER LOG
+          console.log("🆕 New user opted in (active):", whatsappId);
+        }
+        // 🟢 RESUME EVENT LOG
+        console.log("🟢 Resume triggered:", whatsappId);
+      } catch (err) {
+        console.error("❌ Failed to save resume status:", err.message);
+      }
+      return res.type("text/xml").send(`<Response><Message>I’m back 😊 You can ask me to remind you of something anytime.</Message></Response>`);
+    }
+
+    // 🔹 STEP 6: Consent gate — if paused, silently ignore
+    if (consentStatus === 'paused') {
+      // 🔇 PAUSED USER LOG (EVENT-BASED)
+      console.log("🔇 User is paused — no response sent:", whatsappId);
+      return res.type("text/xml").send(`<Response></Response>`);
+    }
+
+    // ✅ UPDATED: Warm, open-door intro (no "Reminder" label)
+    if (["hi", "hello", "hey"].includes(lowerClean)) {
+      // 🌟 GREETING EVENT LOG
+      console.log("🌟 Greeting received:", whatsappId);
       return res.type("text/xml").send(`
         <Response><Message>
-        👋 Hi! I'm LifeLine Reminder.
-        Examples:
-        • Remind me to stretch in 30 minutes
-        • Remind me to drink water after 1 hour
-        • Remind me to pray later today
-        • Remind me to call Mom next Friday at 10am
+        👋 Hi, I'm Tim from Lifeline 😊
+        I help you remember things — and I check in with you too.
+        
+        You can say:
+        • "Remind me to stretch in 30 minutes"
+        • "Did I drink water today?"
+        • "I'm feeling tired"
+        • Or just "Hi" anytime!
         </Message></Response>
       `);
     }
 
-    if (!lower.startsWith("remind me to ")) {
+    // ✅ UPDATED: Replace hard rejection with gentle open-door
+    if (!lowerClean.startsWith("remind me to ")) {
+      const intent = detectIntent(originalMessage); // 👈 use originalMessage (with emojis)
+
+      // 📊 INTENT DETECTION LOG (EVENT-BASED)
+      console.log(`📊 Intent detected: ${intent} for ${whatsappId}`);
+
+      let replyText;
+      switch (intent) {
+        case "GREETING":
+          replyText = "Hi 😊 I’m here.";
+          break;
+        case "CHECK_IN":
+          replyText = "Thanks for telling me. I’m here.";
+          break;
+        case "QUESTION":
+          replyText = "I don’t track that yet, but I can help you set it up.";
+          break;
+        case "UNKNOWN":
+        default:
+          replyText = "I might not have understood that yet.\nYou can say things like ‘remind me to…’ or ‘pause’.";
+      }
+
       return res.type("text/xml").send(`
-        <Response><Message>
-        🤖 Please start with "Remind me to ..."
-        Example: "Remind me to call Mom tomorrow at 3pm"
-        </Message></Response>
+        <Response><Message>${replyText}</Message></Response>
       `);
     }
 
-    const instruction = incoming.substring(13).trim();
-    console.log("📝 Original instruction:", instruction);
+    // 👇 REMINDER LOGIC STARTS HERE (with minimal logging)
+    const instruction = originalMessage.substring(13).trim();
+    // ❗ REMOVED: console.log("📝 Original instruction:", instruction); // REMOVE BEFORE PUBLIC LAUNCH
 
     // 👇 CRITICAL FIX: Handle "every" BEFORE chrono
     const lowerInst = instruction.toLowerCase();
     let what, parsedDate, isRecurring = false;
 
     if (lowerInst.includes('every')) {
-      console.log("🔁 Detected 'every' — bypassing chrono, using custom logic");
+      // 🔁 RECURRING DETECTION LOG (EVENT-BASED)
+      console.log("🔁 Detected 'every' (recurring) for:", whatsappId);
       const recurringResult = handleRecurringInstruction(instruction);
       if (!recurringResult) {
+        // ❓ PARSING FAILURE LOG
+        console.log("❓ Recurring instruction parse failed for:", whatsappId);
         return res.type("text/xml").send(`
           <Response><Message>
           🔁 I support:
@@ -165,15 +264,16 @@ module.exports = function (app) {
         .replace(/\bthis evening\b/gi, 'today at 7pm')
         .replace(/\btonight\b/gi, 'today at 8pm');
 
-      console.log("🔧 Normalized instruction:", normalizedInstruction);
+      // ❗ REMOVED: console.log("🔧 Normalized instruction:", normalizedInstruction); // REMOVE BEFORE PUBLIC LAUNCH
 
       const results = chrono.parse(normalizedInstruction);
-      console.log("🧠 Chrono parse results:", results);
+      // ❗ REMOVED: console.log("🧠 Chrono parse results:", results); // REMOVE BEFORE PUBLIC LAUNCH
 
       if (results.length > 0) {
         const timeRef = results[0];
         const timeText = timeRef.text;
-        console.log("⏰ Time text found:", timeText);
+        // ⏰ TIME PARSED LOG (EVENT-BASED)
+        console.log("⏰ Time parsed successfully for:", whatsappId);
         
         what = instruction
           .replace(new RegExp(timeText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '')
@@ -190,7 +290,8 @@ module.exports = function (app) {
         what = what.replace(/\s+(?:at|on|by|in|after|around|to|for)$/i, '').trim();
         parsedDate = timeRef.start.date();
       } else {
-        console.log("⚠️ No time found by chrono, using fallbacks");
+        // ⚠️ FALLBACK PARSING LOG (EVENT-BASED)
+        console.log("⚠️ Using fallback parsing for:", whatsappId);
         let fallbackUsed = false;
 
         // 🌆 "later today"
@@ -198,7 +299,8 @@ module.exports = function (app) {
           what = instruction.replace(/later today/gi, "").trim() || "this";
           parsedDate = new Date(Date.now() + 2 * 60 * 60 * 1000);
           fallbackUsed = true;
-          console.log("🌙 'later today' → 2 hours from now");
+          // 🌙 FALLBACK LOG
+          console.log("🌙 Used 'later today' fallback for:", whatsappId);
         }
         // 🌃 "tonight"
         else if (instruction.toLowerCase().includes("tonight")) {
@@ -206,7 +308,8 @@ module.exports = function (app) {
           const now = new Date();
           parsedDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 20, 0, 0);
           fallbackUsed = true;
-          console.log("🌃 'tonight' → 8 PM today");
+          // 🌃 FALLBACK LOG
+          console.log("🌃 Used 'tonight' fallback for:", whatsappId);
         }
         // 🌅 "tomorrow"
         else if (instruction.toLowerCase().includes("tomorrow")) {
@@ -215,10 +318,13 @@ module.exports = function (app) {
           tomorrow.setDate(tomorrow.getDate() + 1);
           parsedDate = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 9, 0, 0);
           fallbackUsed = true;
-          console.log("🌅 'tomorrow' → 9 AM tomorrow");
+          // 🌅 FALLBACK LOG
+          console.log("🌅 Used 'tomorrow' fallback for:", whatsappId);
         }
 
         if (!fallbackUsed) {
+          // ❌ PARSING FAILURE LOG
+          console.log("❌ No time could be parsed for:", whatsappId);
           return res.type("text/xml").send(`
             <Response><Message>
             🤔 When should I remind you? I couldn't find a clear time in: "${instruction}"
@@ -235,11 +341,12 @@ module.exports = function (app) {
       }
     }
 
-    // ... rest of validation, saving, and response (unchanged) ...
-    console.log("📅 Parsed date:", parsedDate);
-    console.log("✅ Task extracted:", what);
+    // ❗ REMOVED: console.log("📅 Parsed date:", parsedDate); // REMOVE BEFORE PUBLIC LAUNCH
+    // ❗ REMOVED: console.log("✅ Task extracted:", what); // REMOVE BEFORE PUBLIC LAUNCH
 
     if (!parsedDate || isNaN(parsedDate.getTime())) {
+      // ❌ INVALID DATE LOG
+      console.log("❌ Invalid date parsed for:", whatsappId);
       return res.type("text/xml").send(`
         <Response><Message>
         ❌ I couldn't understand the time in your message.
@@ -249,6 +356,8 @@ module.exports = function (app) {
     }
 
     if (parsedDate.getTime() <= Date.now()) {
+      // ⚠️ PAST DATE LOG
+      console.log("⚠️ Past date provided by:", whatsappId);
       return res.type("text/xml").send(`
         <Response><Message>
         ⚠️ That time is in the past! Please choose a future time.
@@ -274,7 +383,8 @@ module.exports = function (app) {
       if (err) {
         console.error('❌ SQLite insert error:', err.message);
       } else {
-        console.log('✅ Saved to SQLite');
+        // ✅ REMINDER CREATED LOG (EVENT-BASED)
+        console.log('✅ Reminder created for:', whatsappId);
       }
     });
     stmt.finalize();
@@ -293,6 +403,9 @@ module.exports = function (app) {
       hour12: true
     });
 
+    // 📤 RESPONSE SENT LOG (EVENT-BASED)
+    console.log("📤 Response sent for reminder creation:", whatsappId);
+    
     res.type("text/xml").send(`
       <Response><Message>
       ${isRecurring ? '🔁' : '✅'} Done! I'll remind you to *${what}* at *${displayDate}*.
