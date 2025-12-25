@@ -110,11 +110,21 @@ module.exports = function (app) {
     const from = req.body.From;
     const whatsappId = from.replace("whatsapp:", "");
 
-    // ❗ REMOVED: console.log("\n💬 Incoming:", rawIncoming); // REMOVE BEFORE PUBLIC LAUNCH
-    // ❗ REMOVED: console.log("👤 From:", whatsappId); // REMOVE BEFORE PUBLIC LAUNCH
+    // 1️⃣ Truly empty input
+    if (!rawIncoming || rawIncoming.trim().length === 0) {
+      return res.type("text/xml").send(`
+        <Response><Message>Hi. I’m here.</Message></Response>
+      `);
+    }
 
-    if (!rawIncoming) {
-      return res.type("text/xml").send(`<Response></Response>`);
+    // 2️⃣ Emoji-only or symbol-only input
+    const hasLetters = /[a-zA-Z\u00C0-\u017F]/.test(rawIncoming);
+    const hasEmoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(rawIncoming);
+
+    if (!hasLetters && hasEmoji) {
+      return res.type("text/xml").send(`
+        <Response><Message>I’m here. You don’t have to explain.</Message></Response>
+      `);
     }
 
     // 🔹 STEP 1: Normalize text
@@ -200,7 +210,7 @@ module.exports = function (app) {
           replyText = "Thanks for telling me. I’m here.";
           break;
         case "QUESTION":
-          replyText = "I don’t track that yet, but I can help you set it up.";
+          replyText = "I’m still learning! You can ask me to set reminders, or just say hi.";
           break;
         case "UNKNOWN":
         default:
@@ -208,34 +218,6 @@ module.exports = function (app) {
       }
 
       return res.type("text/xml").send(`<Response><Message>${replyText}</Message></Response>`);
-    }
-
-    // ✅ UPDATED: Replace hard rejection with gentle open-door
-    if (!lowerClean.startsWith("remind me to ")) {
-      const intent = detectIntent(originalMessage); // 👈 use originalMessage (with emojis)
-
-      // 📊 INTENT DETECTION LOG (EVENT-BASED)
-      console.log(`📊 Intent detected: ${intent} for ${whatsappId}`);
-
-      let replyText;
-      switch (intent) {
-        case "GREETING":
-          replyText = "Hi 😊 I’m here.";
-          break;
-        case "CHECK_IN":
-          replyText = "Thanks for telling me. I’m here.";
-          break;
-        case "QUESTION":
-          replyText = "I don’t track that yet, but I can help you set it up.";
-          break;
-        case "UNKNOWN":
-        default:
-          replyText = "I might not have understood that yet.\nYou can say things like ‘remind me to…’ or ‘pause’.";
-      }
-
-      return res.type("text/xml").send(`
-        <Response><Message>${replyText}</Message></Response>
-      `);
     }
 
     // 👇 REMINDER LOGIC STARTS HERE (with minimal logging)

@@ -31,8 +31,11 @@ function detectIntent(message) {
   const greetingWords = ["hi", "hello", "hey"];
   const greetingPhrases = [
     "good morning",
+    "morning",
     "good afternoon",
+    "afternoon",
     "good evening",
+    "evening",
     "are you there"
   ];
 
